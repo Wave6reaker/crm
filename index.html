@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM - Клиенты</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .action-btn {
+            color: #6c757d;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .action-btn:hover {
+            color: #0d6efd;
+        }
+        
+        /* Анимации для модального окна */
+        .modal.fade .modal-dialog {
+            transition: transform 0.3s ease-out;
+            transform: translateY(-100px);
+        }
+        
+        .modal.show .modal-dialog {
+            transform: translateY(0);
+        }
+        
+        /* Стили для автодополнения */
+        .autocomplete-container {
+            position: relative;
+        }
+        
+        .autocomplete-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        
+        .autocomplete-item:hover,
+        .autocomplete-item.active {
+            background-color: #f8f9fa;
+        }
+        
+        /* Стили для валидации */
+        .is-invalid {
+            border-color: #dc3545;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right calc(0.375em + 0.1875rem) center;
+            background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        }
+        
+        .invalid-feedback {
+            display: block;
+            color: #dc3545;
+            font-size: 0.875em;
+            margin-top: 0.25rem;
+        }
+        
+        /* Стили для спиннера загрузки */
+        .spinner-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .table-container {
+            position: relative;
+            min-height: 200px;
+        }
+        
+        /* Подсветка найденного контакта */
+        .highlight-row {
+            background-color: #fff3cd !important;
+        }
+
+        /* Темная тема */
+        body.dark-mode {
+            background-color: #333;
+            color: #fff;
+        }
+
+        body.dark-mode .card,
+        body.dark-mode .modal-content {
+            background-color: #444;
+            color: #fff;
+        }
+
+        body.dark-mode .table {
+            color: #fff;
+        }
+
+        body.dark-mode .table-hover tbody tr:hover {
+            background-color: rgba(255, 255, 255, 0.075);
+        }
+
+        body.dark-mode .form-control,
+        body.dark-mode .form-select {
+            background-color: #555;
+            color: #fff;
+            border-color: #666;
+        }
+
+        body.dark-mode .btn-outline-primary {
+            color: #fff;
+            border-color: #fff;
+        }
+
+        body.dark-mode .btn-outline-primary:hover {
+            background-color: #fff;
+            color: #333;
+        }
+
+        body.dark-mode .action-btn {
+            color: #fff;
+        }
+
+        body.dark-mode .action-btn:hover {
+            color: #17a2b8;
+        }
+
+        body.dark-mode .modal-header,
+        body.dark-mode .modal-footer {
+            border-color: #666;
+        }
+
+        body.dark-mode .close {
+            color: #fff;
+        }
+
+        body.dark-mode .spinner-overlay {
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        /* Переключатель темной темы */
+        .theme-switch {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row mb-4">
+            <div class="col">
+                <div class="autocomplete-container">
+                    <div class="input-group">
+                        <span class="input-group-text bg-primary text-white">skb.</span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Введите запрос">
+                    </div>
+                    <div class="autocomplete-results" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <h2 class="mb-4">Клиенты</h2>
+        
+        <div class="table-container">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th><a href="#" class="action-btn" data-sort="id">ID <i class="fas fa-sort"></i></a></th>
+                            <th><a href="#" class="action-btn" data-sort="lastName">Фамилия <i class="fas fa-sort"></i></a></th>
+                            <th><a href="#" class="action-btn" data-sort="firstName">Имя <i class="fas fa-sort"></i></a></th>
+                            <th><a href="#" class="action-btn" data-sort="middleName">Отчество <i class="fas fa-sort"></i></a></th>
+                            <th><a href="#" class="action-btn" data-sort="created">Дата и время создания <i class="fas fa-sort"></i></a></th>
+                            <th><a href="#" class="action-btn" data-sort="modified">Последние изменения <i class="fas fa-sort"></i></a></th>
+                            <th>Контакты</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clientTableBody">
+                        <!-- Клиенты будут добавлены здесь динамически -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="tableSpinner" class="spinner-overlay" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Загрузка...</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-4">
+            <button class="btn btn-outline-primary" id="addClientBtn">
+                <i class="fas fa-plus"></i> Добавить клиента
+            </button>
+        </div>
+    </div>
+
+    <!-- Модальное окно для добавления/редактирования клиента -->
+    <div class="modal fade" id="clientModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="clientModalTitle">Добавить клиента</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="clientForm" novalidate>
+                        <input type="hidden" id="clientId">
+                        <div class="mb-3">
+                            <label for="clientLastName" class="form-label">Фамилия</label>
+                            <input type="text" class="form-control" id="clientLastName" required>
+                            <div class="invalid-feedback">Пожалуйста, введите фамилию</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="clientFirstName" class="form-label">Имя</label>
+                            <input type="text" class="form-control" id="clientFirstName" required>
+                            <div class="invalid-feedback">Пожалуйста, введите имя</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="clientMiddleName" class="form-label">Отчество</label>
+                            <input type="text" class="form-control" id="clientMiddleName">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Контакты</label>
+                            <div id="contactsContainer">
+                                <!-- Контакты будут добавлены здесь динамически -->
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary mt-2" id="addContactBtn">
+                                <i class="fas fa-plus"></i> Добавить контакт
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="saveClientBtn">
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                        <span class="btn-text">Сохранить</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для подтверждения удаления -->
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Подтверждение удаления</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Вы уверены, что хотите удалить этого клиента?</p>
+                    <p><strong>Это действие нельзя отменить.</strong></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Удалить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Переключатель темной темы -->
+    <div class="theme-switch">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="darkModeToggle">
+            <label class="form-check-label" for="darkModeToggle">Темная тема</label>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Функция для сохранения данных в куки
+        function saveToCookies(key, value) {
+            document.cookie = `${key}=${JSON.stringify(value)}; expires=Fri, 31 Dec 9999 23:59:59 GMT; path=/`;
+        }
+
+        // Функция для загрузки данных из куки
+        function loadFromCookies(key) {
+            const name = `${key}=`;
+            const decodedCookie = decodeURIComponent(document.cookie);
+            const ca = decodedCookie.split(';');
+            for(let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) == ' ') {
+                    c = c.substring(1);
+                }
+                if (c.indexOf(name) == 0) {
+                    return JSON.parse(c.substring(name.length, c.length));
+                }
+            }
+            return null;
+        }
+
+        // Загрузка клиентов из куки или использование начальных данных
+        let clients = loadFromCookies('clients') || [
+            { id: 123455, lastName: "Скворцов", firstName: "Денис", middleName: "Юрьевич", created: "2021-02-21T12:41:00", modified: "2021-02-21T13:50:00", contacts: [
+                { type: "phone", value: "+7 (999) 999-99-99" },
+                { type: "email", value: "example@example.com" },
+                { type: "facebook", value: "https://facebook.com/example" },
+                { type: "vk", value: "https://vk.com/example" }
+            ]},
+            { id: 123456, lastName: "Куприянов", firstName: "Арсений", middleName: "Валерьевич", created: "2021-01-28T16:40:00", modified: "2021-02-02T17:01:00", contacts: [
+                { type: "phone", value: "+7 (888) 888-88-88" },
+                { type: "email", value: "example2@example.com" }
+            ]},
+        ];
+
+        let currentSort = { key: null, direction: 'asc' };
+        let clientToDelete = null;
+        let selectedAutocompleteIndex = -1;
+
+        // Функция для имитации задержки загрузки
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Функция для отображения/скрытия спиннера таблицы
+        function toggleTableSpinner(show) {
+            document.getElementById('tableSpinner').style.display = show ? 'flex' : 'none';
+        }
+
+        // Функция для отображения/скрытия спиннера кнопки сохранения
+        function toggleSaveSpinner(show) {
+            const saveBtn = document.getElementById('saveClientBtn');
+            const spinner = saveBtn.querySelector('.spinner-border');
+            const text = saveBtn.querySelector('.btn-text');
+            
+            saveBtn.disabled = show;
+            spinner.classList.toggle('d-none', !show);
+            text.style.display = show ? 'none' : 'inline';
+        }
+
+        // Функция для валидации формы
+        function validateForm() {
+            const form = document.getElementById('clientForm');
+            const lastName = document.getElementById('clientLastName');
+            const firstName = document.getElementById('clientFirstName');
+            const contacts = document.querySelectorAll('#contactsContainer .input-group');
+            
+            let isValid = true;
+            
+            // Сбрасываем предыдущие ошибки
+            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            form.querySelectorAll('.invalid-feedback').forEach(el => el.style.display = 'none');
+            
+            if (!lastName.value.trim()) {
+                lastName.classList.add('is-invalid');
+                lastName.nextElementSibling.style.display = 'block';
+                isValid = false;
+            }
+            
+            if (!firstName.value.trim()) {
+                firstName.classList.add('is-invalid');
+                firstName.nextElementSibling.style.display = 'block';
+                isValid = false;
+            }
+            
+            contacts.forEach(contact => {
+                const select = contact.querySelector('select');
+                const input = contact.querySelector('input');
+                const value = input.value.trim();
+                
+                if (!value) {
+                    input.classList.add('is-invalid');
+                    isValid = false;
+                } else {
+                    // Валидация email
+                    if (select.value === 'email' && !isValidEmail(value)) {
+                        input.classList.add('is-invalid');
+                        isValid = false;
+                    }
+                    // Валидация телефона
+                    if (select.value === 'phone' && !isValidPhone(value)) {
+                        input.classList.add('is-invalid');
+                        isValid = false;
+                    }
+                }
+            });
+            
+            return isValid;
+        }
+
+        // Добавьте эти функции для валидации email и телефона
+        function isValidEmail(email) {
+            const re = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+            return re.test(email);
+        }
+
+        function isValidPhone(phone) {
+            const re = /^\+?[0-9]{10,14}$/;
+            return re.test(phone.replace(/[\s()-]/g, ''));
+        }
+
+        // Функция для получения иконки контакта
+        function getContactIcon(contact) {
+            let icon, title;
+            switch (contact.type) {
+                case 'phone':
+                    icon = 'fa-phone';
+                    title = `Телефон: ${contact.value}`;
+                    break;
+                case 'email':
+                    icon = 'fa-envelope';
+                    title = `Email: ${contact.value}`;
+                    break;
+                case 'facebook':
+                    icon = 'fab fa-facebook';
+                    title = `Facebook: ${contact.value}`;
+                    break;
+                case 'vk':
+                    icon = 'fab fa-vk';
+                    title = `VK: ${contact.value}`;
+                    break;
+                default:
+                    icon = 'fa-link';
+                    title = `Другое: ${contact.value}`;
+            }
+            return `<i class="fas ${icon} text-primary me-2" data-bs-toggle="tooltip" data-bs-placement="top" title="${title}"></i>`;
+        }
+
+        // Функция для инициализации тултипов
+        function initTooltips() {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl)
+            })
+        }
+
+        // Функция для отображения клиентов
+        async function displayClients(highlightId = null) {
+            toggleTableSpinner(true);
+            await delay(300); // Уменьшенная задержка для более быстрой загрузки
+            
+            const tableBody = document.getElementById('clientTableBody');
+            tableBody.innerHTML = '';
+            clients.forEach(client => {
+                const row = document.createElement('tr');
+                if (client.id === highlightId) {
+                    row.classList.add('highlight-row');
+                }
+                row.innerHTML = `
+                    <td>${client.id}</td>
+                    <td>${client.lastName}</td>
+                    <td>${client.firstName}</td>
+                    <td>${client.middleName}</td>
+                    <td>${new Date(client.created).toLocaleString('ru-RU')}</td>
+                    <td>${new Date(client.modified).toLocaleString('ru-RU')}</td>
+                    <td>
+                        ${client.contacts.map(contact => getContactIcon(contact)).join('')}
+                    </td>
+                    <td>
+                        <a href="#" class="action-btn me-2" onclick="editClient(${client.id})"><i class="fas fa-edit"></i> Изменить</a>
+                        <a href="#" class="action-btn text-danger" onclick="showDeleteConfirmation(${client.id})"><i class="fas fa-trash"></i> Удалить</a>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+            toggleTableSpinner(false);
+            initTooltips();
+        }
+
+        // Функция для добавления поля контакта
+        function addContactField(type = '', value = '') {
+            const contactsContainer = document.getElementById('contactsContainer');
+            const contactField = document.createElement('div');
+            contactField.className = 'input-group mb-2';
+            contactField.innerHTML = `
+                <select class="form-select" style="max-width: 130px;">
+                    <option value="phone" ${type === 'phone' ? 'selected' : ''}>Телефон</option>
+                    <option value="email" ${type === 'email' ? 'selected' : ''}>Email</option>
+                    <option value="facebook" ${type === 'facebook' ? 'selected' : ''}>Facebook</option>
+                    <option value="vk" ${type === 'vk' ? 'selected' : ''}>VK</option>
+                    <option value="other" ${type === 'other' ? 'selected' : ''}>Другое</option>
+                </select>
+                <input type="text" class="form-control" placeholder="Введите контакт" value="${value}">
+                <button class="btn btn-outline-secondary" type="button" onclick="this.closest('.input-group').remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="invalid-feedback">Неверный формат</div>
+            `;
+            contactsContainer.appendChild(contactField);
+
+            const input = contactField.querySelector('input');
+            const select = contactField.querySelector('select');
+            
+            input.addEventListener('input', function() {
+                this.classList.remove('is-invalid');
+                this.nextElementSibling.nextElementSibling.style.display = 'none';
+            });
+
+            select.addEventListener('change', function() {
+                input.classList.remove('is-invalid');
+                input.nextElementSibling.nextElementSibling.style.display = 'none';
+            });
+        }
+
+        // Функция для редактирования клиента
+        function editClient(id) {
+            const client = clients.find(c => c.id === id);
+            if (client) {
+                document.getElementById('clientId').value = client.id;
+                document.getElementById('clientLastName').value = client.lastName;
+                document.getElementById('clientFirstName').value = client.firstName;
+                document.getElementById('clientMiddleName').value = client.middleName;
+                document.getElementById('clientModalTitle').textContent = 'Редактировать клиента';
+                
+                const contactsContainer = document.getElementById('contactsContainer');
+                contactsContainer.innerHTML = '';
+                client.contacts.forEach(contact => addContactField(contact.type, contact.value));
+                
+                const clientModal = new bootstrap.Modal(document.getElementById('clientModal'));
+                clientModal.show();
+            }
+        }
+
+        // Функция для показа модального окна подтверждения удаления
+        function showDeleteConfirmation(id) {
+            clientToDelete = id;
+            const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+            deleteConfirmModal.show();
+        }
+
+        // Функция для удаления клиента
+        function deleteClient() {
+            if (clientToDelete !== null) {
+                clients = clients.filter(client => client.id !== clientToDelete);
+                saveToCookies('clients', clients);
+                displayClients();
+                clientToDelete = null;
+                bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+            }
+        }
+
+        // Обработчик для сохранения клиента
+        document.getElementById('saveClientBtn').addEventListener('click', async function() {
+            if (!validateForm()) {
+                return;
+            }
+            
+            toggleSaveSpinner(true);
+
+            const id = document.getElementById('clientId').value;
+            const lastName = document.getElementById('clientLastName').value;
+            const firstName = document.getElementById('clientFirstName').value;
+            const middleName = document.getElementById('clientMiddleName').value;
+            
+            const contactFields = document.querySelectorAll('#contactsContainer .input-group');
+            const contacts = Array.from(contactFields).map(field => ({
+                type: field.querySelector('select').value,
+                value: field.querySelector('input').value
+            })).filter(contact => contact.value.trim() !== '');
+
+            await delay(300); // Имитация задержки сохранения
+
+            if (id) {
+                const index = clients.findIndex(c => c.id === parseInt(id));
+                if (index !== -1) {
+                    clients[index] = { 
+                        ...clients[index], 
+                        lastName, 
+                        firstName, 
+                        middleName, 
+                        contacts,
+                        modified: new Date().toISOString() 
+                    };
+                }
+            } else {
+                const newId = clients.length > 0 ? Math.max(...clients.map(c => c.id)) + 1 : 1;
+                const now = new Date().toISOString();
+                clients.push({ 
+                    id: newId, 
+                    lastName, 
+                    firstName, 
+                    middleName, 
+                    contacts,
+                    created: now, 
+                    modified: now
+                });
+            }
+
+            saveToCookies('clients', clients);
+            toggleSaveSpinner(false);
+            displayClients();
+            bootstrap.Modal.getInstance(document.getElementById('clientModal')).hide();
+            window.location.hash = '';
+        });
+
+        // Обработчики для снятия класса is-invalid при вводе
+        ['clientLastName', 'clientFirstName'].forEach(id => {
+            document.getElementById(id).addEventListener('input', function() {
+                this.classList.remove('is-invalid');
+                if (this.value.trim() !== '') {
+                    this.classList.remove('is-invalid');
+                }
+            });
+        });
+
+        // Обработчик для кнопки "Добавить клиента"
+        document.getElementById('addClientBtn').addEventListener('click', function() {
+            document.getElementById('clientForm').reset();
+            document.getElementById('clientId').value = '';
+            document.getElementById('clientModalTitle').textContent = 'Добавить клиента';
+            document.getElementById('contactsContainer').innerHTML = '';
+            
+            document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            
+            const clientModal = new bootstrap.Modal(document.getElementById('clientModal'));
+            clientModal.show();
+        });
+
+        // Обработчик для кнопки "Добавить контакт"
+        document.getElementById('addContactBtn').addEventListener('click', function() {
+            addContactField();
+        });
+
+        // Обработчик для подтверждения удаления
+        document.getElementById('confirmDeleteBtn').addEventListener('click', deleteClient);
+
+        // Функция для сортировки клиентов
+        function sortClients(key) {
+            if (currentSort.key === key) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.key = key;
+                currentSort.direction = 'asc';
+            }
+
+            clients.sort((a, b) => {
+                let valueA = a[key];
+                let valueB = b[key];
+
+                if (key === 'created' || key === 'modified') {
+                    valueA = new Date(valueA);
+                    valueB = new Date(valueB);
+                }
+
+                if (valueA < valueB) return currentSort.direction === 'asc' ? -1 : 1;
+                if (valueA > valueB) return currentSort.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+
+            displayClients();
+            updateSortIcons();
+        }
+
+        // Функция для обновления иконок сортировки
+        function updateSortIcons() {
+            document.querySelectorAll('[data-sort]').forEach(element => {
+                const key = element.dataset.sort;
+                const icon = element.querySelector('i');
+                if (key === currentSort.key) {
+                    icon.className = `fas fa-sort-${currentSort.direction === 'asc' ? 'up' : 'down'}`;
+                } else {
+                    icon.className = 'fas fa-sort';
+                }
+            });
+        }
+
+        // Обработчики для сортировки
+        document.querySelectorAll('[data-sort]').forEach(element => {
+            element.addEventListener('click', function(e) {
+                e.preventDefault();
+                sortClients(this.dataset.sort);
+            });
+        });
+
+        // Функция для обработки hash-навигации
+        function handleHash() {
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                const clientId = parseInt(hash);
+                if (!isNaN(clientId)) {
+                    editClient(clientId);
+                }
+            }
+        }
+
+        // Обработчик изменения hash
+        window.addEventListener('hashchange', handleHash);
+
+        // Функция для переключения темы
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDarkMode);
+        }
+
+        // Инициализация темы
+        const savedDarkMode = localStorage.getItem('darkMode');
+        if (savedDarkMode === 'true') {
+            document.body.classList.add('dark-mode');
+            document.getElementById('darkModeToggle').checked = true;
+        }
+
+        // Обработчик для переключателя темы
+        document.getElementById('darkModeToggle').addEventListener('change', toggleDarkMode);
+
+        // Инициализация отображения клиентов
+        displayClients();
+
+        // Проверяем hash при загрузке страницы
+        handleHash();
+    </script>
+</body>
+</html>
+
